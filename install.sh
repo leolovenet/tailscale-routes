@@ -58,10 +58,13 @@ title "4. 安装路由配置"
 
 if [[ -f "$ROUTES_FILE" ]]; then
   warn "路由文件已存在，跳过(保留您的配置): $ROUTES_FILE"
-else
+elif [[ -f "$SCRIPT_DIR/bypass-routes.txt" ]]; then
   cp "$SCRIPT_DIR/bypass-routes.txt" "$ROUTES_FILE"
   info "路由文件已安装到 $ROUTES_FILE"
   info "请编辑该文件，添加需要直连的 IP 段"
+else
+  touch "$ROUTES_FILE"
+  warn "未找到示例 bypass-routes.txt，已创建空文件: $ROUTES_FILE"
 fi
 
 # ── 配置 sudo 免密(仅对 route-helper)──────────────────────────

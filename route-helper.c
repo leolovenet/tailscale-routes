@@ -24,6 +24,9 @@
 
 #define BUF_SIZE 512
 
+_Static_assert(sizeof(struct rt_msghdr) + 3 * sizeof(struct sockaddr_in) <= BUF_SIZE,
+               "BUF_SIZE too small for route message");
+
 /* ── CIDR 解析 ──────────────────────────────────────────────── */
 
 static int

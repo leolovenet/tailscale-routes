@@ -17,7 +17,9 @@ if launchctl list | grep -q "$PLIST_LABEL" 2>/dev/null; then
 fi
 
 # 再清理路由
-/usr/bin/python3 "$INSTALL_BIN" remove 2>/dev/null || true
+if [[ -f "$INSTALL_BIN" ]]; then
+  /usr/bin/python3 "$INSTALL_BIN" remove || echo "  ⚠️  路由清理失败，请手动检查"
+fi
 
 # 删除文件
 rm -f "$PLIST_DST"

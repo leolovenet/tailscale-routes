@@ -47,7 +47,9 @@ def load_config(conf_path=None):
                 continue
             if "=" in line:
                 key, _, val = line.partition("=")
-                config[key.strip()] = val.strip().strip('"').strip("'")
+                val = val.strip().strip('"').strip("'")
+                val = val.split("#")[0].rstrip()  # 去除行内注释
+                config[key.strip()] = val
     return config
 
 
@@ -95,9 +97,12 @@ def get_gateway():
             parts = line.split()
             if (len(parts) >= 4
                     and parts[0] == "default"
-                    and parts[1][0].isdigit()
                     and not parts[3].startswith("utun")):
-                return parts[1]
+                try:
+                    ipaddress.ip_address(parts[1])
+                    return parts[1]
+                except ValueError:
+                    continue
     except (subprocess.TimeoutExpired, OSError):
         pass
     return None
@@ -194,14 +199,16 @@ def load_state(state_file):
 
 
 def save_state(state_file, gateway, routes, mtime):
-    """保存状态到 JSON 文件"""
+    """保存状态到 JSON 文件（原子写入：write-then-rename）"""
     state = {
         "gateway": gateway,
         "routes": sorted(routes),
         "mtime": mtime,
     }
-    with open(state_file, "w") as f:
+    tmp = state_file + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(state, f)
+    os.replace(tmp, state_file)
 
 
 def clear_state(state_file):
@@ -242,7 +249,11 @@ def remove_routes(config, cidrs):
         config["ROUTE_HELPER"], "del", cidrs
     )
     total = stats.get("total", 0)
-    logger.info(f"✅ 路由删除完成（共 {total} 条）")
+    failed = stats.get("failed", 0)
+    if failed > 0:
+        logger.info(f"⚠️  路由删除完成（共 {total} 条，{failed} 条失败）")
+    else:
+        logger.info(f"✅ 路由删除完成（共 {total} 条）")
     return success
 
 
@@ -284,7 +295,8 @@ def watch(config):
                     active_routes = routes
                     last_mtime = get_file_mtime(routes_file)
                     save_state(state_file, gw, active_routes, last_mtime)
-                prev_active = True
+                    prev_active = True
+                # else: 保持 prev_active=False，下轮重试
 
             else:
                 # ── exit node 保持连接 ──
@@ -311,17 +323,18 @@ def watch(config):
                         new_routes = load_routes(routes_file)
                         to_add = new_routes - active_routes
                         to_del = active_routes - new_routes
-                        if to_del:
-                            remove_routes(config, to_del)
-                        if to_add:
-                            add_routes(config, current_gw, to_add)
+                        del_ok = remove_routes(config, to_del) if to_del else True
+                        add_ok = add_routes(config, current_gw, to_add) if to_add else True
                         if to_add or to_del:
                             logger.info(
                                 f"🔄 路由文件变更：+{len(to_add)} -{len(to_del)}"
                             )
-                        active_routes = new_routes
-                        last_mtime = current_mtime
-                        save_state(state_file, current_gw, active_routes, last_mtime)
+                        if del_ok and add_ok:
+                            active_routes = new_routes
+                            last_mtime = current_mtime
+                            save_state(state_file, current_gw, active_routes, last_mtime)
+                        else:
+                            logger.error("❌ 热更新部分失败，下轮重试")
 
         else:
             if prev_active:
