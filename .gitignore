@@ -1,0 +1,5 @@
+*.log
+*.state
+*.tmp
+.DS_Store
+route-helper
