@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>__PLIST_LABEL__</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>__INSTALL_BIN__</string>
+    <string>watch</string>
+  </array>
+
+  <!-- 用户登录时自动运行 -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- 进程退出后自动重启 -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- 重启间隔（防止崩溃循环），单位秒 -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardErrorPath</key>
+  <string>__ERR_FILE__</string>
+</dict>
+</plist>
