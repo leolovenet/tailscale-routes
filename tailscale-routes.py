@@ -395,11 +395,15 @@ def watch(config):
             if prev_active:
                 # ── exit node 刚断开 ──
                 logger.info("🔌 Exit node 已断开，清理路由")
-                remove_routes(config, active_routes)
-                clear_state(state_file)
-                active_routes = set()
-                last_mtime = 0.0
-            prev_active = False
+                if remove_routes(config, active_routes):
+                    clear_state(state_file)
+                    active_routes = set()
+                    last_mtime = 0.0
+                    prev_active = False
+                else:
+                    logger.error("❌ 路由清理失败，下轮重试")
+            else:
+                prev_active = False
 
         logger.rotate()
         time.sleep(POLL_INTERVAL)

@@ -46,13 +46,13 @@ info "route-helper 已编译并安装到 $ROUTE_HELPER"
 # ── 安装 Python 主脚本 ───────────────────────────────────────────
 title "3. 安装主脚本"
 
-cp "$SCRIPT_DIR/tailscale-routes.py" "$INSTALL_BIN"
-chmod +x "$INSTALL_BIN"
+sudo cp "$SCRIPT_DIR/tailscale-routes.py" "$INSTALL_BIN"
+sudo chmod +x "$INSTALL_BIN"
 info "脚本已安装到 $INSTALL_BIN"
 
 # ── 安装共享配置 ──────────────────────────────────────────────────
-mkdir -p "$CONF_INSTALL_DIR"
-cp "$SCRIPT_DIR/tailscale-routes.conf" "$CONF_INSTALL_DIR/tailscale-routes.conf"
+sudo mkdir -p "$CONF_INSTALL_DIR"
+sudo cp "$SCRIPT_DIR/tailscale-routes.conf" "$CONF_INSTALL_DIR/tailscale-routes.conf"
 info "配置已安装到 $CONF_INSTALL_DIR/tailscale-routes.conf"
 
 # ── 安装路由配置文件(已存在则跳过，不覆盖用户数据)────────────
@@ -61,11 +61,11 @@ title "4. 安装路由配置"
 if [[ -f "$ROUTES_FILE" ]]; then
   warn "路由文件已存在，跳过(保留您的配置): $ROUTES_FILE"
 elif [[ -f "$SCRIPT_DIR/bypass-routes.txt" ]]; then
-  cp "$SCRIPT_DIR/bypass-routes.txt" "$ROUTES_FILE"
+  sudo cp "$SCRIPT_DIR/bypass-routes.txt" "$ROUTES_FILE"
   info "路由文件已安装到 $ROUTES_FILE"
   info "请编辑该文件，添加需要直连的 IP 段"
 else
-  touch "$ROUTES_FILE"
+  sudo touch "$ROUTES_FILE"
   warn "未找到示例 bypass-routes.txt，已创建空文件: $ROUTES_FILE"
 fi
 
@@ -86,6 +86,8 @@ title "6. 安装 launchd 守护进程"
 
 # 如果已存在，先停止旧版本
 /usr/bin/python3 "$INSTALL_BIN" stop 2>/dev/null || true
+# fallback: 确保 launchd 已卸载 (防止 daemon_stop 中 launchctl unload 失败)
+launchctl unload "$PLIST_DST" 2>/dev/null || true
 
 # 从模板生成 plist，替换占位符
 mkdir -p "$HOME/Library/LaunchAgents"
