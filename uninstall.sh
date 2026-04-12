@@ -17,9 +17,9 @@ fi
 
 # 删除文件
 rm -f "$PLIST_DST"
-rm -f "$INSTALL_BIN"
-rm -f "$ROUTE_HELPER"
-rm -f "$CONF_INSTALL_DIR/tailscale-routes.conf"
+sudo rm -f "$INSTALL_BIN"
+sudo rm -f "$ROUTE_HELPER"
+sudo rm -f "$CONF_INSTALL_DIR/tailscale-routes.conf"
 sudo rm -f "$SUDOERS_FILE"
 rm -f "$STATE_FILE"
 rm -f "$LOG_FILE"

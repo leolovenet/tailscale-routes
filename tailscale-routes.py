@@ -355,21 +355,23 @@ def watch(config):
                 # 检查网关变化
                 if current_gw and saved_gw and current_gw != saved_gw:
                     logger.info(f"🔀 网关变化 {saved_gw} → {current_gw}，重建路由")
-                    remove_routes(config, active_routes)
-                    clear_state(state_file)
-                    active_routes = set()
-                    time.sleep(1)
-                    routes = load_routes(routes_file, probe_ip)
-                    last_mtime = get_file_mtime(routes_file)
-                    if routes and add_routes(config, current_gw, routes):
-                        active_routes = routes
-                        save_state(state_file, current_gw, active_routes, last_mtime)
-                    elif not routes:
-                        pass  # 路由文件为空，等热更新触发
+                    if not remove_routes(config, active_routes):
+                        logger.error("❌ 旧路由清理失败，下轮重试")
                     else:
-                        # add 失败，重置状态让下轮重新进入首次连接分支
-                        prev_active = False
-                        last_mtime = 0.0
+                        clear_state(state_file)
+                        active_routes = set()
+                        time.sleep(1)
+                        routes = load_routes(routes_file, probe_ip)
+                        last_mtime = get_file_mtime(routes_file)
+                        if routes and add_routes(config, current_gw, routes):
+                            active_routes = routes
+                            save_state(state_file, current_gw, active_routes, last_mtime)
+                        elif not routes:
+                            pass  # 路由文件为空，等热更新触发
+                        else:
+                            # add 失败，重置状态让下轮重新进入首次连接分支
+                            prev_active = False
+                            last_mtime = 0.0
 
                 # 检查路由文件热更新
                 elif current_gw:
