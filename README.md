@@ -66,6 +66,8 @@ cd tailscale-routes
 
 保存后 5 秒内自动生效（热更新），无需重启守护进程或手动操作。
 
+> **注意**：bypass-routes.txt 中的网段不能覆盖探测 IP（默认 `8.8.8.8`，可在 `tailscale-routes.conf` 的 `PROBE_IP` 中修改）。该 IP 用于检测 exit node 是否激活，如果被旁路路由覆盖，检测会失效。程序会自动排除冲突网段并在日志中报错，但建议提前避免。
+
 ## 常用命令
 
 | 命令 | 说明 |
@@ -100,6 +102,7 @@ cd tailscale-routes
 
 - sudoers 只授权**当前安装用户**对 `route-helper` 一个二进制的免密执行权限，不使用 setuid
 - C 路由助手对 CIDR 输入做严格校验（`strtol` + `inet_pton`），防止恶意输入操作默认路由
+- 自动检测并排除覆盖探测 IP 的路由，防止 exit node 检测失效导致路由循环添加/删除
 - 以用户级 LaunchAgent 运行（非系统 Daemon），权限范围最小化
 
 ## 注意事项
