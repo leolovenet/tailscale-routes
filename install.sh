@@ -21,7 +21,7 @@ title "1. 检查环境"
 
 if ! command -v tailscale &>/dev/null \
   && [[ ! -d "/Applications/Tailscale.app" ]]; then
-  error "未找到 Tailscale，请先安装（App Store 或 standalone 版均可）"
+  error "未找到 Tailscale，请先安装(App Store 或 standalone 版均可)"
 fi
 
 if ! command -v cc &>/dev/null; then
@@ -53,18 +53,18 @@ mkdir -p "$CONF_INSTALL_DIR"
 cp "$SCRIPT_DIR/tailscale-routes.conf" "$CONF_INSTALL_DIR/tailscale-routes.conf"
 info "配置已安装到 $CONF_INSTALL_DIR/tailscale-routes.conf"
 
-# ── 安装路由配置文件（已存在则跳过，不覆盖用户数据）────────────
+# ── 安装路由配置文件(已存在则跳过，不覆盖用户数据)────────────
 title "4. 安装路由配置"
 
 if [[ -f "$ROUTES_FILE" ]]; then
-  warn "路由文件已存在，跳过（保留您的配置）: $ROUTES_FILE"
+  warn "路由文件已存在，跳过(保留您的配置): $ROUTES_FILE"
 else
   cp "$SCRIPT_DIR/bypass-routes.txt" "$ROUTES_FILE"
   info "路由文件已安装到 $ROUTES_FILE"
   info "请编辑该文件，添加需要直连的 IP 段"
 fi
 
-# ── 配置 sudo 免密（仅对 route-helper）──────────────────────────
+# ── 配置 sudo 免密(仅对 route-helper)──────────────────────────
 title "5. 配置 sudo 免密"
 
 if [[ -f "$SUDOERS_FILE" ]]; then
@@ -73,7 +73,7 @@ else
   echo "$USER ALL=(ALL) NOPASSWD: $ROUTE_HELPER" | \
     sudo tee "$SUDOERS_FILE" > /dev/null
   sudo chmod 440 "$SUDOERS_FILE"
-  info "已添加 sudoers 规则（仅限 $ROUTE_HELPER）"
+  info "已添加 sudoers 规则 (仅限 $ROUTE_HELPER)"
 fi
 
 # ── 安装 launchd 服务 ─────────────────────────────────────────────
