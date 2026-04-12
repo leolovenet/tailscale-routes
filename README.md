@@ -88,7 +88,9 @@ cd tailscale-routes
 
 | 命令 | 说明 |
 |------|------|
-| `tailscale-routes status` | 查看 exit node 状态、网关、活跃路由数、最近日志 |
+| `tailscale-routes status` | 查看守护进程、exit node 状态、网关、活跃路由数、最近日志 |
+| `tailscale-routes start` | 启动守护进程 |
+| `tailscale-routes stop` | 停止守护进程并清理路由 |
 | `tailscale-routes add` | 手动添加路由（调试用） |
 | `tailscale-routes remove` | 手动删除路由 |
 | `tail -f /tmp/tailscale-routes.log` | 实时查看守护进程日志 |

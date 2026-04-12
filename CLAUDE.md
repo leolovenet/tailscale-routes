@@ -63,6 +63,8 @@ Python 单文件主程序 + C 路由助手，两层分工：
 
 ```bash
 tailscale-routes status     # 查看当前状态 + 最近日志
+tailscale-routes start      # 启动守护进程
+tailscale-routes stop       # 停止守护进程并清理路由
 tailscale-routes add        # 手动添加路由
 tailscale-routes remove     # 手动删除路由
 tailscale-routes watch      # 前台运行守护进程

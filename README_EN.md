@@ -89,7 +89,9 @@ Changes take effect within 5 seconds (hot-reload) — no restart or manual actio
 
 | Command | Description |
 |---------|-------------|
-| `tailscale-routes status` | Show exit node status, gateway, active route count, recent logs |
+| `tailscale-routes status` | Show daemon, exit node status, gateway, active route count, recent logs |
+| `tailscale-routes start` | Start the daemon |
+| `tailscale-routes stop` | Stop the daemon and clean up routes |
 | `tailscale-routes add` | Manually add routes (for debugging) |
 | `tailscale-routes remove` | Manually remove routes |
 | `tail -f /tmp/tailscale-routes.log` | Watch daemon logs in real time |
