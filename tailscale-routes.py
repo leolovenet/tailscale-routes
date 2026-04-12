@@ -398,9 +398,21 @@ def watch(config):
 def status(config):
     """打印当前状态"""
     probe_ip = config.get("PROBE_IP", "8.8.8.8")
+    label = config.get("PLIST_LABEL", "com.local.tailscale-routes")
     active = is_exit_node_active(probe_ip)
     gw = get_gateway()
 
+    # 检查守护进程是否在运行
+    try:
+        result = subprocess.run(
+            ["launchctl", "list"],
+            capture_output=True, text=True, timeout=5
+        )
+        daemon_running = label in result.stdout
+    except (subprocess.TimeoutExpired, OSError):
+        daemon_running = False
+
+    print(f"守护进程状态   : {'✅ 运行中' if daemon_running else '⭕ 未运行'}")
     print(f"Exit node 状态 : {'✅ 已激活' if active else '⭕ 未激活'}")
     print(f"当前网关       : {gw or '（获取失败）'}")
 
@@ -426,6 +438,80 @@ def status(config):
         print("（暂无日志）")
 
 
+# ── 守护进程启停 ─────────────────────────────────────────────
+
+def _get_plist_path(config):
+    """推导 launchd plist 安装路径"""
+    label = config.get("PLIST_LABEL", "com.local.tailscale-routes")
+    return os.path.expanduser(f"~/Library/LaunchAgents/{label}.plist")
+
+
+def daemon_stop(config):
+    """停止守护进程并清理路由"""
+    logger = logging.getLogger("tailscale-routes")
+    plist = _get_plist_path(config)
+    label = config.get("PLIST_LABEL", "com.local.tailscale-routes")
+
+    # 先停守护进程
+    try:
+        result = subprocess.run(
+            ["launchctl", "list"],
+            capture_output=True, text=True, timeout=5
+        )
+        if label in result.stdout:
+            subprocess.run(
+                ["launchctl", "unload", plist],
+                capture_output=True, timeout=5
+            )
+            print(f"✅ 守护进程已停止")
+            logger.info("🔌 守护进程被 stop 命令停止")
+        else:
+            print("⭕ 守护进程未在运行")
+    except (subprocess.TimeoutExpired, OSError) as e:
+        print(f"⚠️  停止守护进程失败: {e}")
+
+    # 再清理路由
+    state = load_state(config["STATE_FILE"])
+    if state and state.get("routes"):
+        remove_routes(config, state["routes"])
+        clear_state(config["STATE_FILE"])
+        print("✅ 路由已清理")
+
+
+def daemon_start(config):
+    """启动守护进程"""
+    logger = logging.getLogger("tailscale-routes")
+    plist = _get_plist_path(config)
+    label = config.get("PLIST_LABEL", "com.local.tailscale-routes")
+
+    if not os.path.exists(plist):
+        print(f"❌ plist 不存在: {plist}")
+        print("   请先执行 ./install.sh 安装")
+        return
+
+    # 检查是否已在运行
+    try:
+        result = subprocess.run(
+            ["launchctl", "list"],
+            capture_output=True, text=True, timeout=5
+        )
+        if label in result.stdout:
+            print("⭕ 守护进程已在运行")
+            return
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+
+    try:
+        subprocess.run(
+            ["launchctl", "load", plist],
+            capture_output=True, timeout=5
+        )
+        print("✅ 守护进程已启动")
+        logger.info("🚀 守护进程被 start 命令启动")
+    except (subprocess.TimeoutExpired, OSError) as e:
+        print(f"❌ 启动失败: {e}")
+
+
 # ── 入口 ─────────────────────────────────────────────────────
 
 def main():
@@ -434,8 +520,8 @@ def main():
     )
     parser.add_argument(
         "action", nargs="?", default="watch",
-        choices=["watch", "add", "remove", "status"],
-        help="操作：watch(默认) | add | remove | status"
+        choices=["watch", "start", "stop", "add", "remove", "status"],
+        help="操作：watch(默认) | start | stop | add | remove | status"
     )
     args = parser.parse_args()
 
@@ -445,6 +531,10 @@ def main():
 
     if args.action == "watch":
         watch(config)
+    elif args.action == "start":
+        daemon_start(config)
+    elif args.action == "stop":
+        daemon_stop(config)
     elif args.action == "add":
         gw = get_gateway()
         routes = load_routes(config["ROUTES_FILE"], probe_ip)
