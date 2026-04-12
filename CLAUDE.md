@@ -20,7 +20,7 @@ Python 单文件主程序 + C 路由助手，两层分工：
 
 2. **`scutil --mon` 是交互模式**，无法脚本化，不能用来监听网络变化。只能轮询（当前 5 秒）。
 
-3. **`tailscale status --json` 的 `ExitNodeStatus` 字段不稳定**，不要依赖它判断 exit node 是否激活。改用 `route -n get 8.8.8.8` 检查输出是否包含 `utun`，这是 `is_exit_node_active()` 的做法。
+3. **`tailscale status --json` 的 `ExitNodeStatus` 字段不稳定**，不要依赖它判断 exit node 是否激活。改用 `route -n get <PROBE_IP>` 检查输出是否包含 `utun`，这是 `is_exit_node_active()` 的做法。探测 IP 可在 `tailscale-routes.conf` 的 `PROBE_IP` 中配置（默认 `8.8.8.8`）。
 
 4. **网络切换时 `/etc/resolv.conf` 不一定更新**，不适合作为 launchd `WatchPaths` 触发器。
 
@@ -36,7 +36,9 @@ Python 单文件主程序 + C 路由助手，两层分工：
 
 10. **RTM_CHANGE 不允许网关在目标网段内。** macOS 内核对 RTM_ADD 宽松但对 RTM_CHANGE 严格。测试时网关地址不要在测试路由网段内。
 
-11. **shell 脚本中不要用全角括号紧贴 `$变量`。** 如 `$ROUTE_HELPER）` 中的全角 `）`（UTF-8: `ef bc 89`）会被 bash 当作变量名的一部分，在 `set -u` 下触发 unbound variable 错误。统一用半角 `()` 或用 `${变量}` 隔离。
+11. **探测 IP 不能被 bypass-routes.txt 中的网段覆盖。** 如果 `PROBE_IP`（默认 `8.8.8.8`）被某条旁路路由覆盖（如 `8.0.0.0/8`），exit node 检测会失效，导致路由无限循环添加/删除。`load_routes()` 会自动检测并排除冲突网段，但应在配置时就避免。
+
+12. **shell 脚本中不要用全角括号紧贴 `$变量`。** 如 `$ROUTE_HELPER）` 中的全角 `）`（UTF-8: `ef bc 89`）会被 bash 当作变量名的一部分，在 `set -u` 下触发 unbound variable 错误。统一用半角 `()` 或用 `${变量}` 隔离。
 
 ## 设计约定（修改代码时请遵守）
 
@@ -44,6 +46,8 @@ Python 单文件主程序 + C 路由助手，两层分工：
 - **最小权限 sudo**：sudoers 只授权安装者本人（`$USER`）对 `route-helper` 免密，不使用 setuid。
 - **bypass-routes.txt 不需要 sudo**：`/usr/local/etc/` 在装了 Homebrew 的 macOS 上是用户可写的。
 - **用户级 LaunchAgent**：plist 安装到 `~/Library/LaunchAgents/`（非系统 Daemon），以当前用户身份运行。
+- **exit node 双重检测**：`is_exit_node_active()` 先用 `pgrep` 确认 Tailscale 进程在运行，再用 `route -n get` 检查路由是否走 utun。避免其他 VPN 的 utun 接口造成误判。
+- **探测 IP 冲突自动排除**：`load_routes()` 会检查每条 CIDR 是否覆盖 `PROBE_IP`，覆盖的自动排除并记 error 日志，防止检测失效。
 - **空网关防御**：`get_gateway()` 返回 None 时不触发路由操作，等下一轮轮询。
 - **只用系统自带工具**：Python 只用标准库（兼容 3.9+），C 只用系统头文件，不引入第三方依赖。
 - **日志只记摘要**：路由添加/删除只记总数和失败数，不逐条记录。
