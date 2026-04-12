@@ -36,6 +36,8 @@ Python 单文件主程序 + C 路由助手，两层分工：
 
 10. **RTM_CHANGE 不允许网关在目标网段内。** macOS 内核对 RTM_ADD 宽松但对 RTM_CHANGE 严格。测试时网关地址不要在测试路由网段内。
 
+11. **shell 脚本中不要用全角括号紧贴 `$变量`。** 如 `$ROUTE_HELPER）` 中的全角 `）`（UTF-8: `ef bc 89`）会被 bash 当作变量名的一部分，在 `set -u` 下触发 unbound variable 错误。统一用半角 `()` 或用 `${变量}` 隔离。
+
 ## 设计约定（修改代码时请遵守）
 
 - **幂等**：C 助手 add 遇 EEXIST 降级为 RTM_CHANGE，del 遇 ESRCH 静默跳过。
