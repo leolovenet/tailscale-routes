@@ -38,9 +38,11 @@ parse_cidr(const char *cidr, struct in_addr *addr, struct in_addr *mask)
         return -1;
     *slash = '\0';
 
-    int prefix = atoi(slash + 1);
-    if (prefix < 0 || prefix > 32)
+    char *endptr;
+    long prefix_l = strtol(slash + 1, &endptr, 10);
+    if (endptr == slash + 1 || *endptr != '\0' || prefix_l < 0 || prefix_l > 32)
         return -1;
+    int prefix = (int)prefix_l;
 
     if (inet_pton(AF_INET, buf, addr) != 1)
         return -1;
@@ -150,7 +152,8 @@ main(int argc, char *argv[])
 
     /* 禁止回环——不读响应，避免接收缓冲区溢出 */
     int off = 0;
-    setsockopt(s, SOL_SOCKET, SO_USELOOPBACK, &off, sizeof(off));
+    if (setsockopt(s, SOL_SOCKET, SO_USELOOPBACK, &off, sizeof(off)) < 0)
+        perror("warning: setsockopt(SO_USELOOPBACK)");
 
     char buf[BUF_SIZE];
     char line[256];
@@ -173,6 +176,7 @@ main(int argc, char *argv[])
 
         total++;
 
+        /* PF_ROUTE write() 是原子操作，不会出现 partial write */
         if (is_add) {
             int len = build_msg(buf, RTM_ADD, ++seq,
                                 net_addr, &gw_addr, net_mask);
