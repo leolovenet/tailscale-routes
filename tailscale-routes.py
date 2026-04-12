@@ -124,17 +124,19 @@ def _is_tailscale_running():
         return False
 
 
-def is_exit_node_active():
+def is_exit_node_active(probe_ip="8.8.8.8"):
     """
     判断 Tailscale exit node 是否激活。
-    先检查 Tailscale 进程是否在运行，再检查公网流量是否走 utun。
+    先检查 Tailscale 进程是否在运行，再检查探测 IP 的路由是否走 utun。
     双重检查避免其他 VPN 的 utun 接口造成误判。
+
+    probe_ip 不能被 bypass-routes.txt 覆盖，否则检测会失效。
     """
     if not _is_tailscale_running():
         return False
     try:
         result = subprocess.run(
-            ["route", "-n", "get", "8.8.8.8"],
+            ["route", "-n", "get", probe_ip],
             capture_output=True, text=True, timeout=5
         )
         return "utun" in result.stdout
@@ -290,6 +292,7 @@ def watch(config):
 
     routes_file = config["ROUTES_FILE"]
     state_file = config["STATE_FILE"]
+    probe_ip = config.get("PROBE_IP", "8.8.8.8")
 
     # 启动时清理残留路由
     state = load_state(state_file)
@@ -302,7 +305,7 @@ def watch(config):
     last_mtime = 0.0
 
     while True:
-        active = is_exit_node_active()
+        active = is_exit_node_active(probe_ip)
         gw = get_gateway()
 
         if active:
@@ -375,7 +378,8 @@ def watch(config):
 
 def status(config):
     """打印当前状态"""
-    active = is_exit_node_active()
+    probe_ip = config.get("PROBE_IP", "8.8.8.8")
+    active = is_exit_node_active(probe_ip)
     gw = get_gateway()
 
     print(f"Exit node 状态 : {'✅ 已激活' if active else '⭕ 未激活'}")
