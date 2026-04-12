@@ -335,12 +335,16 @@ def watch(config):
                 time.sleep(STABILIZE_WAIT)
                 gw = get_gateway()
                 routes = load_routes(routes_file, probe_ip)
-                if routes and add_routes(config, gw, routes):
+                if not routes:
+                    # 路由文件为空，标记已处理，等热更新触发
+                    last_mtime = get_file_mtime(routes_file)
+                    prev_active = True
+                elif add_routes(config, gw, routes):
                     active_routes = routes
                     last_mtime = get_file_mtime(routes_file)
                     save_state(state_file, gw, active_routes, last_mtime)
                     prev_active = True
-                # else: 保持 prev_active=False，下轮重试
+                # else: add_routes 失败，保持 prev_active=False，下轮重试
 
             else:
                 # ── exit node 保持连接 ──
@@ -360,6 +364,12 @@ def watch(config):
                     if routes and add_routes(config, current_gw, routes):
                         active_routes = routes
                         save_state(state_file, current_gw, active_routes, last_mtime)
+                    elif not routes:
+                        pass  # 路由文件为空，等热更新触发
+                    else:
+                        # add 失败，重置状态让下轮重新进入首次连接分支
+                        prev_active = False
+                        last_mtime = 0.0
 
                 # 检查路由文件热更新
                 elif current_gw:

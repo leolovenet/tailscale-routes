@@ -38,7 +38,9 @@ info "环境检查通过"
 title "2. 编译 route-helper"
 
 cc -O2 -Wall -Wextra -o "$SCRIPT_DIR/route-helper" "$SCRIPT_DIR/route-helper.c"
-cp "$SCRIPT_DIR/route-helper" "$ROUTE_HELPER"
+sudo cp "$SCRIPT_DIR/route-helper" "$ROUTE_HELPER"
+sudo chown root:wheel "$ROUTE_HELPER"
+sudo chmod 755 "$ROUTE_HELPER"
 info "route-helper 已编译并安装到 $ROUTE_HELPER"
 
 # ── 安装 Python 主脚本 ───────────────────────────────────────────
