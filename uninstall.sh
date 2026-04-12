@@ -10,15 +10,9 @@ echo "🗑️  开始卸载 tailscale-routes..."
 source "$SCRIPT_DIR/tailscale-routes.conf"
 PLIST_DST="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
 
-# 先停止守护进程(否则它会在 ≤5 秒内重新添加刚删除的路由)
-if launchctl list | grep -q "$PLIST_LABEL" 2>/dev/null; then
-  launchctl unload "$PLIST_DST" 2>/dev/null || true
-  echo "  ✅ 守护进程已停止"
-fi
-
-# 再清理路由
+# 停止守护进程并清理路由 (stop = unload + remove routes)
 if [[ -f "$INSTALL_BIN" ]]; then
-  /usr/bin/python3 "$INSTALL_BIN" remove || echo "  ⚠️  路由清理失败，请手动检查"
+  /usr/bin/python3 "$INSTALL_BIN" stop || echo "  ⚠️  停止/清理失败，请手动检查"
 fi
 
 # 删除文件

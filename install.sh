@@ -84,11 +84,8 @@ fi
 # ── 安装 launchd 服务 ─────────────────────────────────────────────
 title "6. 安装 launchd 守护进程"
 
-# 如果已存在，先卸载旧版本
-if launchctl list | grep -q "$PLIST_LABEL" 2>/dev/null; then
-  warn "检测到旧版本，先卸载..."
-  launchctl unload "$PLIST_DST" 2>/dev/null || true
-fi
+# 如果已存在，先停止旧版本
+/usr/bin/python3 "$INSTALL_BIN" stop 2>/dev/null || true
 
 # 从模板生成 plist，替换占位符
 mkdir -p "$HOME/Library/LaunchAgents"
@@ -97,9 +94,9 @@ sed -e "s|__PLIST_LABEL__|$PLIST_LABEL|g" \
     -e "s|__ERR_FILE__|$ERR_FILE|g" \
     "$SCRIPT_DIR/com.local.tailscale-routes.plist.template" > "$PLIST_DST"
 chmod 644 "$PLIST_DST"
-launchctl load "$PLIST_DST"
 
-info "守护进程已启动"
+# 启动守护进程
+/usr/bin/python3 "$INSTALL_BIN" start
 
 # ── 完成 ──────────────────────────────────────────────────────────
 echo ""
