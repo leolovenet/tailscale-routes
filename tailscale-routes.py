@@ -200,15 +200,19 @@ def load_state(state_file):
 
 def save_state(state_file, gateway, routes, mtime):
     """保存状态到 JSON 文件（原子写入：write-then-rename）"""
+    logger = logging.getLogger("tailscale-routes")
     state = {
         "gateway": gateway,
         "routes": sorted(routes),
         "mtime": mtime,
     }
     tmp = state_file + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(state, f)
-    os.replace(tmp, state_file)
+    try:
+        with open(tmp, "w") as f:
+            json.dump(state, f)
+        os.replace(tmp, state_file)
+    except OSError as e:
+        logger.error(f"❌ 状态文件写入失败: {e}")
 
 
 def clear_state(state_file):
@@ -302,7 +306,7 @@ def watch(config):
                 # ── exit node 保持连接 ──
                 current_gw = gw
                 state = load_state(state_file)
-                saved_gw = state["gateway"] if state else None
+                saved_gw = state.get("gateway") if state else None
 
                 # 检查网关变化
                 if current_gw and saved_gw and current_gw != saved_gw:
