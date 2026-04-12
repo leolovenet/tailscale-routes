@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 tailscale-routes - macOS Tailscale exit node bypass route manager
 
@@ -116,7 +116,7 @@ def _is_tailscale_running():
         # App Store 版: GUI 进程名为 "Tailscale"
         # Standalone 版: 守护进程名为 "tailscaled"
         result = subprocess.run(
-            ["pgrep", "-xi", "tailscale|tailscaled"],
+            ["pgrep", "-xiE", "tailscale|tailscaled"],
             capture_output=True, timeout=3
         )
         return result.returncode == 0
@@ -351,11 +351,12 @@ def watch(config):
                     logger.info(f"🔀 网关变化 {saved_gw} → {current_gw}，重建路由")
                     remove_routes(config, active_routes)
                     clear_state(state_file)
+                    active_routes = set()
                     time.sleep(1)
                     routes = load_routes(routes_file, probe_ip)
+                    last_mtime = get_file_mtime(routes_file)
                     if routes and add_routes(config, current_gw, routes):
                         active_routes = routes
-                        last_mtime = get_file_mtime(routes_file)
                         save_state(state_file, current_gw, active_routes, last_mtime)
 
                 # 检查路由文件热更新

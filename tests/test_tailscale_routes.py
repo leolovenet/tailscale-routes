@@ -201,6 +201,69 @@ class TestLoadRoutesInvalid(unittest.TestCase):
 
 
 # ===========================================================================
+# 2b. test_probe_ip_conflict_exclusion
+# ===========================================================================
+
+class TestProbeIpConflict(unittest.TestCase):
+    """Tests for load_routes() probe IP conflict detection."""
+
+    def _write_routes(self, lines):
+        tf = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
+        tf.write("\n".join(lines) + "\n")
+        tf.close()
+        return tf.name
+
+    def test_covering_route_excluded(self):
+        """8.0.0.0/8 covers probe 8.8.8.8, should be excluded"""
+        path = self._write_routes(["8.0.0.0/8", "10.0.0.0/8"])
+        try:
+            result = tr.load_routes(path, probe_ip="8.8.8.8")
+            self.assertNotIn("8.0.0.0/8", result)
+            self.assertIn("10.0.0.0/8", result)
+        finally:
+            os.unlink(path)
+
+    def test_exact_match_excluded(self):
+        """8.8.8.0/24 covers probe 8.8.8.8, should be excluded"""
+        path = self._write_routes(["8.8.8.0/24", "1.1.1.0/24"])
+        try:
+            result = tr.load_routes(path, probe_ip="8.8.8.8")
+            self.assertNotIn("8.8.8.0/24", result)
+            self.assertIn("1.1.1.0/24", result)
+        finally:
+            os.unlink(path)
+
+    def test_default_route_excluded(self):
+        """0.0.0.0/0 covers everything including probe IP"""
+        path = self._write_routes(["0.0.0.0/0", "10.0.0.0/8"])
+        try:
+            result = tr.load_routes(path, probe_ip="8.8.8.8")
+            self.assertNotIn("0.0.0.0/0", result)
+            self.assertIn("10.0.0.0/8", result)
+        finally:
+            os.unlink(path)
+
+    def test_unrelated_route_not_excluded(self):
+        """10.0.0.0/8 does not cover 8.8.8.8"""
+        path = self._write_routes(["10.0.0.0/8", "192.168.0.0/16"])
+        try:
+            result = tr.load_routes(path, probe_ip="8.8.8.8")
+            self.assertIn("10.0.0.0/8", result)
+            self.assertIn("192.168.0.0/16", result)
+        finally:
+            os.unlink(path)
+
+    def test_no_probe_ip_skips_check(self):
+        """Without probe_ip, no exclusion happens"""
+        path = self._write_routes(["8.0.0.0/8"])
+        try:
+            result = tr.load_routes(path, probe_ip=None)
+            self.assertIn("8.0.0.0/8", result)
+        finally:
+            os.unlink(path)
+
+
+# ===========================================================================
 # 3. test_parse_gateway
 # ===========================================================================
 
@@ -329,6 +392,47 @@ class TestExitNodeDetect(unittest.TestCase):
     def test_oserror_returns_false(self):
         with patch("subprocess.run", side_effect=OSError("not found")):
             self.assertFalse(tr.is_exit_node_active())
+
+
+# ===========================================================================
+# 4b. test_is_tailscale_running
+# ===========================================================================
+
+class TestIsTailscaleRunning(unittest.TestCase):
+    """Tests for _is_tailscale_running() in isolation."""
+
+    def test_process_found(self):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        with patch("subprocess.run", return_value=mock_result):
+            self.assertTrue(tr._is_tailscale_running())
+
+    def test_process_not_found(self):
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        with patch("subprocess.run", return_value=mock_result):
+            self.assertFalse(tr._is_tailscale_running())
+
+    def test_pgrep_uses_extended_regex(self):
+        """Verify pgrep is called with -xiE and alternation pattern"""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            tr._is_tailscale_running()
+            args = mock_run.call_args[0][0]
+            self.assertEqual(args[0], "pgrep")
+            self.assertIn("E", args[1])  # -xiE contains E
+            self.assertIn("|", args[2])  # pattern has alternation
+
+    def test_oserror_returns_false(self):
+        with patch("subprocess.run", side_effect=OSError("pgrep not found")):
+            self.assertFalse(tr._is_tailscale_running())
+
+    def test_timeout_returns_false(self):
+        import subprocess
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(
+                cmd="pgrep", timeout=3)):
+            self.assertFalse(tr._is_tailscale_running())
 
 
 # ===========================================================================
