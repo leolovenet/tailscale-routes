@@ -146,10 +146,11 @@ def is_exit_node_active(probe_ip="8.8.8.8"):
 
 # ── 路由文件加载 ─────────────────────────────────────────────
 
-def load_routes(routes_file):
+def load_routes(routes_file, probe_ip=None):
     """
     读取 bypass-routes.txt，返回 set[str]。
     过滤注释、空行、\\r，用 ipaddress 校验 CIDR 格式。
+    如果指定了 probe_ip，会检查是否被路由覆盖并排除冲突网段。
     """
     routes = set()
     logger = logging.getLogger("tailscale-routes")
@@ -166,6 +167,23 @@ def load_routes(routes_file):
                     logger.warning(f"⚠️  无效 CIDR，跳过: {line}")
     except OSError as e:
         logger.error(f"❌ 路由文件读取失败: {e}")
+
+    # 检查 probe_ip 是否被路由覆盖
+    if probe_ip and routes:
+        try:
+            probe = ipaddress.ip_address(probe_ip)
+            conflicts = [r for r in routes
+                         if probe in ipaddress.ip_network(r, strict=False)]
+            if conflicts:
+                for c in conflicts:
+                    logger.error(
+                        f"❌ 路由 {c} 覆盖了探测 IP {probe_ip}，"
+                        f"已排除 (否则 exit node 检测会失效导致路由循环)"
+                    )
+                routes -= set(conflicts)
+        except ValueError:
+            pass
+
     return routes
 
 
@@ -314,7 +332,7 @@ def watch(config):
                 logger.info(f"🔗 Exit node 已连接，等待 {STABILIZE_WAIT}s 稳定...")
                 time.sleep(STABILIZE_WAIT)
                 gw = get_gateway()
-                routes = load_routes(routes_file)
+                routes = load_routes(routes_file, probe_ip)
                 if routes and add_routes(config, gw, routes):
                     active_routes = routes
                     last_mtime = get_file_mtime(routes_file)
@@ -334,7 +352,7 @@ def watch(config):
                     remove_routes(config, active_routes)
                     clear_state(state_file)
                     time.sleep(1)
-                    routes = load_routes(routes_file)
+                    routes = load_routes(routes_file, probe_ip)
                     if routes and add_routes(config, current_gw, routes):
                         active_routes = routes
                         last_mtime = get_file_mtime(routes_file)
@@ -344,7 +362,7 @@ def watch(config):
                 elif current_gw:
                     current_mtime = get_file_mtime(routes_file)
                     if current_mtime != last_mtime:
-                        new_routes = load_routes(routes_file)
+                        new_routes = load_routes(routes_file, probe_ip)
                         to_add = new_routes - active_routes
                         to_del = active_routes - new_routes
                         del_ok = remove_routes(config, to_del) if to_del else True
@@ -392,7 +410,7 @@ def status(config):
     else:
         print("已记录网关     : （无，路由未添加）")
 
-    routes = load_routes(config["ROUTES_FILE"])
+    routes = load_routes(config["ROUTES_FILE"], probe_ip)
     print(f"配置路由条数   : {len(routes)}")
 
     print()
@@ -422,12 +440,13 @@ def main():
 
     config = load_config()
     logger = setup_logging(config["LOG_FILE"])
+    probe_ip = config.get("PROBE_IP", "8.8.8.8")
 
     if args.action == "watch":
         watch(config)
     elif args.action == "add":
         gw = get_gateway()
-        routes = load_routes(config["ROUTES_FILE"])
+        routes = load_routes(config["ROUTES_FILE"], probe_ip)
         if routes:
             add_routes(config, gw, routes)
             save_state(config["STATE_FILE"], gw, routes,
@@ -437,7 +456,7 @@ def main():
         if state and state.get("routes"):
             remove_routes(config, state["routes"])
         else:
-            routes = load_routes(config["ROUTES_FILE"])
+            routes = load_routes(config["ROUTES_FILE"], probe_ip)
             if routes:
                 remove_routes(config, routes)
         clear_state(config["STATE_FILE"])
