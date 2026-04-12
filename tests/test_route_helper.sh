@@ -9,7 +9,7 @@
 set -uo pipefail
 
 HELPER="./route-helper"
-GATEWAY="198.51.100.1"
+GATEWAY="192.0.2.1"       # TEST-NET-1 (RFC 5737)，不在任何测试路由网段内
 PASS=0
 FAIL=0
 TOTAL=0
