@@ -1,5 +1,7 @@
 # tailscale-routes
 
+[English](README_EN.md) | 中文
+
 macOS 下 Tailscale 使用 exit node 模式时的分流路由管理工具。
 
 ## 解决什么问题

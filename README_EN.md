@@ -1,5 +1,7 @@
 # tailscale-routes
 
+English | [中文](README.md)
+
 Split-tunneling route manager for macOS when using Tailscale exit nodes.
 
 ## The Problem
