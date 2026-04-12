@@ -7,6 +7,8 @@ tailscale-routes - macOS Tailscale exit node bypass route manager
 
 用法:
     tailscale-routes watch    - 守护进程模式（默认）
+    tailscale-routes start    - 启动守护进程
+    tailscale-routes stop     - 停止守护进程并清理路由
     tailscale-routes add      - 手动添加路由
     tailscale-routes remove   - 手动删除路由
     tailscale-routes status   - 查看当前状态
@@ -459,12 +461,15 @@ def daemon_stop(config):
             capture_output=True, text=True, timeout=5
         )
         if label in result.stdout:
-            subprocess.run(
+            r = subprocess.run(
                 ["launchctl", "unload", plist],
-                capture_output=True, timeout=5
+                capture_output=True, text=True, timeout=5
             )
-            print(f"✅ 守护进程已停止")
-            logger.info("🔌 守护进程被 stop 命令停止")
+            if r.returncode == 0:
+                print("✅ 守护进程已停止")
+                logger.info("🔌 守护进程被 stop 命令停止")
+            else:
+                print(f"⚠️  停止守护进程可能失败: {r.stderr.strip()}")
         else:
             print("⭕ 守护进程未在运行")
     except (subprocess.TimeoutExpired, OSError) as e:
@@ -473,9 +478,11 @@ def daemon_stop(config):
     # 再清理路由
     state = load_state(config["STATE_FILE"])
     if state and state.get("routes"):
-        remove_routes(config, state["routes"])
-        clear_state(config["STATE_FILE"])
-        print("✅ 路由已清理")
+        if remove_routes(config, state["routes"]):
+            clear_state(config["STATE_FILE"])
+            print("✅ 路由已清理")
+        else:
+            print("⚠️  路由清理失败，状态文件已保留，可手动执行 tailscale-routes remove")
 
 
 def daemon_start(config):
@@ -502,12 +509,15 @@ def daemon_start(config):
         pass
 
     try:
-        subprocess.run(
+        r = subprocess.run(
             ["launchctl", "load", plist],
-            capture_output=True, timeout=5
+            capture_output=True, text=True, timeout=5
         )
-        print("✅ 守护进程已启动")
-        logger.info("🚀 守护进程被 start 命令启动")
+        if r.returncode == 0:
+            print("✅ 守护进程已启动")
+            logger.info("🚀 守护进程被 start 命令启动")
+        else:
+            print(f"❌ 启动失败: {r.stderr.strip()}")
     except (subprocess.TimeoutExpired, OSError) as e:
         print(f"❌ 启动失败: {e}")
 

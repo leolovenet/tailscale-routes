@@ -664,5 +664,125 @@ class TestRouteHelperJson(unittest.TestCase):
         self.assertEqual(captured[0], ["sudo", "/rh", "del"])
 
 
+# ===========================================================================
+# 8. test_daemon_start_stop
+# ===========================================================================
+
+class TestDaemonStop(unittest.TestCase):
+    """Tests for daemon_stop() with mocked subprocess and state."""
+
+    def _make_config(self):
+        return {
+            "PLIST_LABEL": "com.local.tailscale-routes",
+            "STATE_FILE": "/tmp/test-state.json",
+            "ROUTE_HELPER": "/usr/local/bin/route-helper",
+        }
+
+    def _mock_launchctl_list(self, label_present):
+        m = MagicMock()
+        m.stdout = f"123\t0\t{label_present}\n" if label_present else ""
+        return m
+
+    def test_stop_clears_state_only_on_remove_success(self):
+        """State file preserved if remove_routes fails"""
+        config = self._make_config()
+        label = config["PLIST_LABEL"]
+        list_result = self._mock_launchctl_list(label)
+        unload_result = MagicMock(returncode=0)
+
+        state = {"gateway": "1.1.1.1", "routes": ["10.0.0.0/8"]}
+
+        def side_effect(cmd, **kwargs):
+            if cmd[0] == "launchctl" and cmd[1] == "list":
+                return list_result
+            if cmd[0] == "launchctl" and cmd[1] == "unload":
+                return unload_result
+            # route-helper call — simulate failure
+            m = MagicMock()
+            m.returncode = 2
+            m.stdout = ""
+            m.stderr = "fatal"
+            return m
+
+        with patch("subprocess.run", side_effect=side_effect), \
+             patch.object(tr, "load_state", return_value=state), \
+             patch.object(tr, "clear_state") as mock_clear:
+            tr.daemon_stop(config)
+            mock_clear.assert_not_called()
+
+    def test_stop_clears_state_on_remove_success(self):
+        """State file cleared when remove_routes succeeds"""
+        config = self._make_config()
+        label = config["PLIST_LABEL"]
+        list_result = self._mock_launchctl_list(label)
+        unload_result = MagicMock(returncode=0)
+
+        state = {"gateway": "1.1.1.1", "routes": ["10.0.0.0/8"]}
+
+        def side_effect(cmd, **kwargs):
+            if cmd[0] == "launchctl" and cmd[1] == "list":
+                return list_result
+            if cmd[0] == "launchctl" and cmd[1] == "unload":
+                return unload_result
+            # route-helper call — simulate success
+            m = MagicMock()
+            m.returncode = 0
+            m.stdout = '{"total":1,"deleted":1,"failed":0}'
+            return m
+
+        with patch("subprocess.run", side_effect=side_effect), \
+             patch.object(tr, "load_state", return_value=state), \
+             patch.object(tr, "clear_state") as mock_clear:
+            tr.daemon_stop(config)
+            mock_clear.assert_called_once()
+
+
+class TestDaemonStart(unittest.TestCase):
+    """Tests for daemon_start() with mocked subprocess."""
+
+    def _make_config(self):
+        return {
+            "PLIST_LABEL": "com.local.tailscale-routes",
+            "LOG_FILE": "/tmp/test.log",
+        }
+
+    def test_start_plist_not_exist(self):
+        """Should print error if plist doesn't exist"""
+        config = self._make_config()
+        with patch("os.path.exists", return_value=False):
+            # Should not raise, just print error
+            tr.daemon_start(config)
+
+    def test_start_already_running(self):
+        """Should print message and return if daemon already running"""
+        config = self._make_config()
+        label = config["PLIST_LABEL"]
+        list_result = MagicMock()
+        list_result.stdout = f"123\t0\t{label}\n"
+
+        with patch("os.path.exists", return_value=True), \
+             patch("subprocess.run", return_value=list_result):
+            tr.daemon_start(config)
+
+    def test_start_calls_launchctl_load(self):
+        """Should call launchctl load on happy path"""
+        config = self._make_config()
+        calls = []
+
+        def side_effect(cmd, **kwargs):
+            calls.append(cmd)
+            m = MagicMock()
+            m.stdout = ""  # not in launchctl list
+            m.returncode = 0
+            return m
+
+        with patch("os.path.exists", return_value=True), \
+             patch("subprocess.run", side_effect=side_effect):
+            tr.daemon_start(config)
+
+        load_calls = [c for c in calls if c[0] == "launchctl" and c[1] == "load"]
+        self.assertEqual(len(load_calls), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
