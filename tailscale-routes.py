@@ -110,11 +110,28 @@ def get_gateway():
 
 # ── Exit node 检测 ───────────────────────────────────────────
 
+def _is_tailscale_running():
+    """检查 Tailscale 进程是否在运行（App Store 版或 standalone 版）"""
+    try:
+        # App Store 版: GUI 进程名为 "Tailscale"
+        # Standalone 版: 守护进程名为 "tailscaled"
+        result = subprocess.run(
+            ["pgrep", "-xi", "tailscale|tailscaled"],
+            capture_output=True, timeout=3
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
 def is_exit_node_active():
     """
     判断 Tailscale exit node 是否激活。
-    原理：exit node 激活后 8.8.8.8 的路由走 utun 接口。
+    先检查 Tailscale 进程是否在运行，再检查公网流量是否走 utun。
+    双重检查避免其他 VPN 的 utun 接口造成误判。
     """
+    if not _is_tailscale_running():
+        return False
     try:
         result = subprocess.run(
             ["route", "-n", "get", "8.8.8.8"],

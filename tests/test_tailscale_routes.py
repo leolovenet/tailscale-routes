@@ -285,23 +285,39 @@ class TestParseGateway(unittest.TestCase):
 class TestExitNodeDetect(unittest.TestCase):
     """Tests for is_exit_node_active() with mocked subprocess.run."""
 
-    def _mock_run(self, stdout):
-        mock_result = MagicMock()
-        mock_result.stdout = stdout
-        return mock_result
+    def _make_side_effect(self, route_stdout, tailscale_running=True):
+        """创建 side_effect：pgrep 返回进程状态，route 返回路由输出"""
+        pgrep_result = MagicMock()
+        pgrep_result.returncode = 0 if tailscale_running else 1
+
+        route_result = MagicMock()
+        route_result.stdout = route_stdout
+
+        def side_effect(cmd, **kwargs):
+            if cmd[0] == "pgrep":
+                return pgrep_result
+            return route_result
+
+        return side_effect
 
     def test_utun_in_output_returns_true(self):
         output = "   interface: utun3\n   gateway: 100.64.0.1\n"
-        with patch("subprocess.run", return_value=self._mock_run(output)):
+        with patch("subprocess.run", side_effect=self._make_side_effect(output)):
             self.assertTrue(tr.is_exit_node_active())
 
     def test_no_utun_returns_false(self):
         output = "   interface: en0\n   gateway: 192.168.1.1\n"
-        with patch("subprocess.run", return_value=self._mock_run(output)):
+        with patch("subprocess.run", side_effect=self._make_side_effect(output)):
             self.assertFalse(tr.is_exit_node_active())
 
     def test_empty_output_returns_false(self):
-        with patch("subprocess.run", return_value=self._mock_run("")):
+        with patch("subprocess.run", side_effect=self._make_side_effect("")):
+            self.assertFalse(tr.is_exit_node_active())
+
+    def test_tailscale_not_running_returns_false(self):
+        output = "   interface: utun3\n   gateway: 100.64.0.1\n"
+        with patch("subprocess.run",
+                    side_effect=self._make_side_effect(output, tailscale_running=False)):
             self.assertFalse(tr.is_exit_node_active())
 
     def test_timeout_returns_false(self):
