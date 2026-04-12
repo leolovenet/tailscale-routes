@@ -52,6 +52,20 @@ cd tailscale-routes
 
 The installer automatically: compiles the C route helper, installs the Python controller, configures passwordless sudo (for `route-helper` only), and registers a user-level launchd agent. Takes effect immediately — no reboot needed.
 
+<details>
+<summary>Files created/modified by install.sh</summary>
+
+| Path | Action | Description |
+|------|--------|-------------|
+| `/usr/local/bin/route-helper` | Create | Compiled C routing helper binary |
+| `/usr/local/bin/tailscale-routes` | Create | Python controller script |
+| `/usr/local/etc/tailscale-routes.conf` | Create | Shared path configuration |
+| `/usr/local/etc/bypass-routes.txt` | Create (if absent) | Route config file; skipped if already exists |
+| `/etc/sudoers.d/tailscale-routes` | Create (requires sudo) | Passwordless sudo rule for current user on route-helper |
+| `~/Library/LaunchAgents/com.local.tailscale-routes.plist` | Create | launchd user agent generated from template |
+
+</details>
+
 ## Configuring Routes
 
 Edit `/usr/local/etc/bypass-routes.txt`, one CIDR per line, `#` for comments:

@@ -51,6 +51,20 @@ cd tailscale-routes
 
 安装脚本会自动完成：编译 C 路由助手、安装 Python 主程序、配置 sudoers 免密（仅限 route-helper）、注册 launchd 用户级守护进程。安装后即刻生效，无需重启。
 
+<details>
+<summary>install.sh 会创建/修改的文件</summary>
+
+| 路径 | 操作 | 说明 |
+|------|------|------|
+| `/usr/local/bin/route-helper` | 创建 | 编译后的 C 路由助手二进制 |
+| `/usr/local/bin/tailscale-routes` | 创建 | Python 主程序 |
+| `/usr/local/etc/tailscale-routes.conf` | 创建 | 共享路径配置 |
+| `/usr/local/etc/bypass-routes.txt` | 创建 (如不存在) | 路由配置文件，已存在则跳过不覆盖 |
+| `/etc/sudoers.d/tailscale-routes` | 创建 (需 sudo) | 当前用户对 route-helper 的免密执行规则 |
+| `~/Library/LaunchAgents/com.local.tailscale-routes.plist` | 创建 | 从模板生成的 launchd 用户级守护进程 |
+
+</details>
+
 ## 配置路由
 
 编辑 `/usr/local/etc/bypass-routes.txt`，每行一个 CIDR，`#` 开头为注释：
