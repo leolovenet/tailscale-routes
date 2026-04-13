@@ -118,7 +118,7 @@ def _is_tailscale_running():
         # App Store 版: GUI 进程名为 "Tailscale"
         # Standalone 版: 守护进程名为 "tailscaled"
         result = subprocess.run(
-            ["pgrep", "-xiE", "tailscale|tailscaled"],
+            ["pgrep", "-xi", "tailscale|tailscaled"],
             capture_output=True, timeout=3
         )
         return result.returncode == 0

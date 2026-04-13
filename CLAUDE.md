@@ -40,6 +40,8 @@ Python 单文件主程序 + C 路由助手，两层分工：
 
 12. **shell 脚本中不要用全角括号紧贴 `$变量`。** 如 `$ROUTE_HELPER）` 中的全角 `）`（UTF-8: `ef bc 89`）会被 bash 当作变量名的一部分，在 `set -u` 下触发 unbound variable 错误。统一用半角 `()` 或用 `${变量}` 隔离。
 
+13. **macOS 的 `pgrep` 不支持 `-E` 扩展正则标志。** Linux/GNU pgrep 有 `-E`，但 BSD pgrep（macOS 自带）会报 `illegal option -- E` 并以 exit code 2 退出。macOS pgrep 默认就接受扩展正则（`|` 等直接可用），不需要 `-E`。误加 `-E` 会导致 `_is_tailscale_running()` 永远返回 False → `is_exit_node_active()` 永远 False → 路由永不注入，且因为用 `returncode == 0` 判断而静默失败，没有任何日志线索。仅用系统工具写 macOS 脚本时要对照 BSD 版本的 man page，不能套用 Linux 习惯。
+
 ## 设计约定（修改代码时请遵守）
 
 - **幂等**：C 助手 add 遇 EEXIST 降级为 RTM_CHANGE，del 遇 ESRCH 静默跳过。
